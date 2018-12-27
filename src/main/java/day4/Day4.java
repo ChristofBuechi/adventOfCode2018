@@ -1,5 +1,7 @@
 package day4;
 
+import javafx.util.Pair;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -21,16 +23,71 @@ public class Day4 {
     public static void main(String[] args) throws IOException {
         Day4 day4 = new Day4("src/main/resources/day4.txt");
         day4.printStrategy1Result();
+        day4.printStrategy2Result();
+
+    }
+
+    private void printStrategy2Result() {
+        List<Integer> guardList = guardActivityList.stream().filter(guardActivity -> guardActivity.activity == BeginsShift).map(guardActivity -> guardActivity.guardNumber).distinct().collect(Collectors.toList());
+
+        Map<Integer, Pair<Integer, Integer>> guardMap = new HashMap<>();
+        for (Integer guard : guardList) {
+            Map<LocalDate, List<GuardActivity>> activitiesForGuardByDateAndActivity = getActivitiesForGuardByDateAndActivity(guard);
+            Map<LocalDate, int[]> convertToSleepingMinutes = convertToSleepingMinutes(activitiesForGuardByDateAndActivity);
+            int[] minutes = getMostSleepingCount(convertToSleepingMinutes);
+            int mostSleepingMinute = getMostSleepingMinute(minutes);
+            guardMap.put(guard, new Pair<>(mostSleepingMinute, minutes[mostSleepingMinute]));
+        }
+
+        Map.Entry<Integer, Pair<Integer, Integer>> guardWithMinuteAndCount = guardMap.entrySet().stream().max(Comparator.comparing(o -> o.getValue().getValue())).get();
+
+        System.out.println("Actual Result Strategy2 = " + guardWithMinuteAndCount.getKey() * guardWithMinuteAndCount.getValue().getKey());
 
     }
 
     private void printStrategy1Result() {
         int mostSleepingGuard = findMostSleptGuard();
-        Map<LocalDate, List<GuardActivity>> trackingActivities = guardActivityList
-                .stream()
-                .filter(guardActivity -> guardActivity.guardNumber == mostSleepingGuard && guardActivity.activity != BeginsShift)
-                .collect(groupingBy(guardActivity -> guardActivity.dateTime.toLocalDate()));
+        Map<LocalDate, List<GuardActivity>> trackingActivities = getActivitiesForGuardByDateAndActivity(mostSleepingGuard);
 
+        Map<LocalDate, int[]> sleepingArrayMinutesPerDay = convertToSleepingMinutes(trackingActivities);
+
+        int[] sleepingCountPerMinute = getMostSleepingCount(sleepingArrayMinutesPerDay);
+
+
+        int mostSleepingMinute = getMostSleepingMinute(sleepingCountPerMinute);
+
+
+        System.out.println("Actual Result Strategy1 = " + mostSleepingGuard * mostSleepingMinute);
+
+
+    }
+
+    private int[] getMostSleepingCount(Map<LocalDate, int[]> sleepingArrayMinutesPerDay) {
+        int[] sleepingCountPerMinute = new int[60];
+        for (int minute = 0; minute < sleepingCountPerMinute.length; minute++) {
+            int count = 0;
+
+            for (int[] value : sleepingArrayMinutesPerDay.values()) {
+                if (value[minute] == 1) {
+                    count++;
+                }
+            }
+            sleepingCountPerMinute[minute] = count;
+        }
+        return sleepingCountPerMinute;
+    }
+
+        private int getMostSleepingMinute(int[] sleepingCountPerMinute) {
+            int mostSleepingMinute = -1;
+        for (int minute = 0; minute < sleepingCountPerMinute.length; minute++) {
+            if (mostSleepingMinute == -1 || sleepingCountPerMinute[minute] > sleepingCountPerMinute[mostSleepingMinute]) {
+                mostSleepingMinute = minute;
+            }
+        }
+        return mostSleepingMinute;
+    }
+
+    private Map<LocalDate, int[]> convertToSleepingMinutes(Map<LocalDate, List<GuardActivity>> trackingActivities) {
         Map<LocalDate, int[]> list = new HashMap<>(trackingActivities.size());
         trackingActivities.forEach(new BiConsumer<LocalDate, List<GuardActivity>>() {
             @Override
@@ -59,30 +116,14 @@ public class Day4 {
                 list.put(localDate, minutes);
             }
         });
+        return list;
+    }
 
-        int[] sleepingCountPerMinute = new int[60];
-        for (int minute = 0; minute < sleepingCountPerMinute.length; minute++) {
-            int count = 0;
-
-            for (int[] value : list.values()) {
-                if (value[minute] == 1) {
-                    count++;
-                }
-            }
-            sleepingCountPerMinute[minute] = count;
-        }
-
-        int mostSleepingMinute = -1;
-        for (int minute = 0; minute < sleepingCountPerMinute.length; minute++) {
-            if (mostSleepingMinute == -1 || sleepingCountPerMinute[minute] > sleepingCountPerMinute[mostSleepingMinute]) {
-                mostSleepingMinute = minute;
-            }
-        }
-
-
-        System.out.println("Actual Result = " + mostSleepingGuard * mostSleepingMinute);
-
-
+    private Map<LocalDate, List<GuardActivity>> getActivitiesForGuardByDateAndActivity(int guard) {
+        return guardActivityList
+                    .stream()
+                    .filter(guardActivity -> guardActivity.guardNumber == guard && guardActivity.activity != BeginsShift)
+                    .collect(groupingBy(guardActivity -> guardActivity.dateTime.toLocalDate()));
     }
 
     private Integer findMostSleptGuard() {
